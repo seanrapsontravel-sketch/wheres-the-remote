@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Where's the remote?",
+  "version": "1.1.0",
+  "description": "Works on LinkedIn and Indeed to reveal whether a job is truly remote, hybrid, onsite or requires travel.",
+  "permissions": ["storage", "scripting", "webNavigation"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://*.indeed.com/*",
+    "https://linkedin-remote-checker-proxy.wherestheremote.workers.dev/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.linkedin.com/jobs/*",
+        "https://www.linkedin.com/preload/*",
+        "https://*.indeed.com/*"
+      ],
+      "all_frames": true,
+      "js": [
+        "src/site.js",
+        "src/classifier.js",
+        "src/cache.js",
+        "src/extractor.js",
+        "src/badge.js",
+        "src/aggregate.js",
+        "src/content.js"
+      ],
+      "css": ["src/badge.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

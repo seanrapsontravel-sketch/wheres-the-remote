@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Where's the remote?</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 700px; margin: 3rem auto; padding: 0 1.5rem; line-height: 1.6; color: #1a1a1a; }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; }
+  ul { padding-left: 1.25rem; }
+  .updated { color: #666; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<h1>Privacy Policy — Where's the remote?</h1>
+<p class="updated">Last updated: 12 August 2026</p>
+
+<p>"Where's the remote?" is a Chrome extension that reads job postings on
+LinkedIn and Indeed and shows whether a role is genuinely remote, hybrid,
+onsite, or requires travel, based on the posting's own description text
+rather than the platform's own label. This page explains what data the
+extension handles and why.</p>
+
+<h2>What data is read</h2>
+<p>While you browse supported LinkedIn and Indeed job pages, the extension
+reads the text of job postings visible on the page (title and description).
+It does not read any other page content, and it does not run on any site
+other than LinkedIn and Indeed.</p>
+
+<h2>What data is sent off your device</h2>
+<p>To classify a job posting, the extension sends that posting's description
+text to our backend — a Cloudflare Worker we operate — which forwards it to
+OpenAI's API to determine the classification. Only the description text
+needed to classify that one posting is sent. No LinkedIn/Indeed account
+details, browsing history, cookies, or other personal information are
+collected or transmitted.</p>
+
+<p>The Worker is stateless: it does not log or store the description text or
+the classification result. It simply relays the request to OpenAI, validates
+the response, and returns it to the extension. OpenAI's API does not use data
+submitted via its API to train its models by default.</p>
+
+<h2>What's stored locally</h2>
+<p>Once a job posting has been classified, the result (category, a short
+reason, and, if relevant, how often office attendance is required) is cached
+on your device using Chrome's local storage (<code>chrome.storage.local</code>)
+for 14 days, keyed to that job listing. This avoids re-classifying the same
+listing every time you see it. This cache never leaves your device and is
+removed automatically after 14 days, or immediately if you uninstall the
+extension.</p>
+
+<h2>What we don't do</h2>
+<ul>
+  <li>We don't sell, rent, or share your data with third parties for advertising or any purpose unrelated to showing you the classification.</li>
+  <li>We don't use the data for any purpose beyond providing the extension's single feature.</li>
+  <li>We don't track you across sites, build user profiles, or use analytics/ad SDKs in the extension.</li>
+  <li>We don't require or collect any account, email, or sign-in information.</li>
+</ul>
+
+<h2>Third parties involved</h2>
+<ul>
+  <li><strong>Cloudflare</strong> hosts the relay Worker that forwards requests to OpenAI. Requests pass through Cloudflare's standard infrastructure logging, subject to <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</li>
+  <li><strong>OpenAI</strong> processes the submitted job description text to return a classification, subject to <a href="https://openai.com/policies/privacy-policy">OpenAI's privacy policy</a>.</li>
+</ul>
+
+<h2>Contact</h2>
+<p>Questions about this policy can be sent to
+<a href="mailto:seanrapsontravel@gmail.com">seanrapsontravel@gmail.com</a>.</p>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+name = "linkedin-remote-checker-proxy"
+main = "src/index.js"
+compatibility_date = "2026-08-12"
+workers_dev = true
+
+[vars]
+OPENAI_MODEL = "gpt-5.6-luna"
+
+# OPENAI_API_KEY is set as a Cloudflare secret with:
+#   npx wrangler secret put OPENAI_API_KEY
+# — never stored in this file or committed to git.
+
+# Bounds abuse of the OpenAI credential: this endpoint is otherwise anonymous
+# and its URL is public (shipped in the extension), so anyone who finds it
+# can call it directly. 20 requests/minute per IP is well above what a real
+# user's extension needs (a handful of job cards per page load) but blocks
+# scripted floods.
+[[ratelimits]]
+name = "CLASSIFY_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60
