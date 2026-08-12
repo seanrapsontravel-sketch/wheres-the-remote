@@ -123,8 +123,13 @@ class RequestTooLargeError extends Error {}
  * An opaque, stable-per-install value for OpenAI's safety_identifier, so
  * abuse can be traced to one installation without OpenAI ever receiving the
  * raw id we hold. SHA-256 over the id plus a deployment-specific salt where
- * one is configured, since a bare UUID hash is reversible by anyone who can
- * guess candidate ids.
+ * one is configured.
+ *
+ * The salt does not defend against brute force — a v4 UUID is 122 bits, so
+ * enumerating candidates is infeasible either way. It defends against
+ * confirmation: someone who already holds a specific install id matching it
+ * against a digest on OpenAI's side. Changing the salt rotates every
+ * installation's identifier, so treat it as set-once.
  */
 async function safetyIdentifier(installId, salt) {
   const digest = await crypto.subtle.digest(

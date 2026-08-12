@@ -139,6 +139,21 @@ though `src/index.js` never writes it. `docs/privacy.html` discloses this.
 Sampling stays at 1 on purpose — the token counts are the only cost signal
 there is, and sampling below 1 would undercount the number the alerts watch.
 
-Optionally set `SAFETY_ID_SALT` as a second Cloudflare secret. It salts the
-hash sent to OpenAI as `safety_identifier`, so an unsalted digest of a v4 UUID
-can't be reversed by brute-forcing candidate ids.
+`SAFETY_ID_SALT` is a second Cloudflare secret, and it is set. It salts the
+hash sent to OpenAI as `safety_identifier`.
+
+Be accurate about what that buys, because an earlier version of this note was
+not. It does **not** stop the digest being reversed by brute force: a v4 UUID
+carries 122 bits of entropy, so enumerating candidate ids is infeasible with or
+without a salt. What it stops is *confirmation* — someone who has independently
+obtained a specific install id checking it against a digest held on OpenAI's
+side. That is a narrow threat, and narrower still now that Cloudflare's
+invocation logs may hold the raw id anyway (see above), where it needs no
+reversing at all.
+
+The reason to set it early is timing rather than strength. The digest is over
+salt-plus-id, so introducing or changing the salt rotates every installation's
+`safety_identifier` exactly once, discarding whatever continuity OpenAI's abuse
+tracking had built on the old values. Doing that before the extension has users
+costs nothing; doing it afterwards has a real, if small, cost. Set it once and
+leave it alone.

@@ -10,9 +10,11 @@ OPENAI_MODEL = "gpt-5.6-luna"
 #   npx wrangler secret put OPENAI_API_KEY
 # — never stored in this file or committed to git.
 #
-# SAFETY_ID_SALT is an optional secret, set the same way. It salts the hash
-# sent to OpenAI as safety_identifier so a bare install-id hash can't be
-# reversed by brute-forcing candidate UUIDs.
+# SAFETY_ID_SALT is a second secret, set the same way, and it is set. It salts
+# the hash sent to OpenAI as safety_identifier. It does not defend against
+# brute force — a v4 UUID is 122 bits — but against someone who already holds
+# an install id confirming it against a digest OpenAI holds. Set-once: changing
+# it rotates every installation's identifier. See README.md.
 
 # Workers Logs. Without this there is no record of how much the endpoint is
 # being used, which is the difference between noticing abuse in an hour and
