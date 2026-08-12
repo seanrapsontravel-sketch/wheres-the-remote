@@ -11,6 +11,75 @@ Live (GitHub Pages, deploying from `main` / `/docs`):
 https://seanrapsontravel-sketch.github.io/wheres-the-remote/privacy.html
 ```
 
+## Store listing fields
+
+**Category:** Productivity
+
+**Language:** English (United Kingdom)
+
+**Summary / short description**
+
+> See whether LinkedIn and Indeed jobs are truly remote, hybrid, onsite, or
+> travel-heavy—based on the full job description.
+
+**Detailed description**
+
+> Stop relying on the platform's "Remote" label alone.
+>
+> Where's the remote? reads the job description and adds a clear verdict to
+> LinkedIn and Indeed listings: Remote, Hybrid, Onsite, Travel, or Not stated.
+> Open a verdict to see the evidence behind it, including any stated office
+> attendance or travel requirement.
+>
+> Use the optional filter to hide hybrid and non-remote roles, so you can focus
+> on jobs that match the way you actually want to work.
+>
+> FEATURES
+> • Clear remote-work verdicts beside job listings
+> • Short evidence summaries based on the posting itself
+> • Office-frequency and travel indicators when stated
+> • Optional filtering of hybrid and non-remote roles
+> • Support for LinkedIn Jobs and Indeed
+> • 14-day local result cache to avoid checking the same listing repeatedly
+>
+> YOUR CHOICE AND PRIVACY
+> Before the first remote check, the extension explains that up to 8,000
+> characters of a job description and a random installation identifier will
+> be sent through our Cloudflare-hosted service to OpenAI. Nothing is sent
+> until you select “Enable remote checks”. You can pause checks and clear
+> locally saved results at any time.
+>
+> The extension does not require an account, include advertising, track you
+> across sites, or read pages outside LinkedIn and Indeed job sections. See the
+> privacy policy for full details.
+
+## Media assets
+
+- **Small promotional tile (440×280):**
+  `chrome-store-assets/small-promo-tile-440x280.png`
+- **Screenshots (1280×800), in upload order:**
+  1. `chrome-store-screenshots/01-indeed-remote-reality.jpg` — See the real
+     working pattern directly in Indeed results.
+  2. `chrome-store-screenshots/02-linkedin-remote-reality-filtered.jpg` — Hide
+     hybrid and non-remote roles in one click.
+  3. `chrome-store-screenshots/03-linkedin-all-verdicts.jpg` — Compare Remote,
+     Hybrid, Onsite, Travel, and Not stated verdicts at a glance.
+  4. `chrome-store-screenshots/04-indeed-evidence-and-not-stated.jpg` — Expand a
+     verdict to see the evidence behind it.
+  5. `chrome-store-screenshots/05-linkedin-true-remote-detail.jpg` — Confirm a
+     genuinely remote role from the full posting.
+
+## Reviewer test instructions
+
+1. Install the extension and open a LinkedIn Jobs search page or an Indeed
+   search page containing job results.
+2. On the inline first-run card, select **Enable remote checks**.
+3. Wait for verdict badges to appear beside listings, then select a badge to
+   view its evidence.
+4. Turn on **Hide hybrid & non-remote** to verify filtering.
+5. Select **Pause remote checks** to verify that new classifications stop;
+   select **Clear saved results** to remove the local cache.
+
 ## Single purpose description
 
 > Where's the remote? analyzes job postings on LinkedIn and Indeed and shows
@@ -88,6 +157,16 @@ against each other, and against what the code actually does.
 - **Used for purposes unrelated to the extension's single purpose:** No.
 - **Used to determine creditworthiness or for lending:** No.
 - Certify: data handling matches this disclosure.
+
+## In-product disclosure and consent
+
+On the first LinkedIn or Indeed jobs page, the extension displays an inline
+activation card before it extracts or transmits any job description. The card
+states that up to 8,000 characters of each description and a random install
+identifier are sent to the Cloudflare-hosted classification service and
+OpenAI, and that results are saved locally for 14 days to avoid repeat checks.
+Classification starts only after the user selects **Enable remote checks**.
+**Not now** leaves it disabled, and **Pause remote checks** withdraws consent.
 
 Two points to be ready to answer on, since both have tripped up reviews:
 

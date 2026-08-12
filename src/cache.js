@@ -77,11 +77,20 @@
     return expired.length;
   }
 
+  async function clearAll() {
+    const all = await chrome.storage.local.get(null);
+    const keys = Object.keys(all).filter(
+      (key) => key.startsWith(KEY_PREFIX) && isCacheEntry(all[key])
+    );
+    if (keys.length) await chrome.storage.local.remove(keys);
+    return keys.length;
+  }
+
   async function set(jobId, result) {
     const entry = { ...result, classifiedAt: Date.now() };
     await chrome.storage.local.set({ [keyFor(jobId)]: entry });
     return entry;
   }
 
-  global.RemoteCache = { TTL_MS, get, getMany, set, purgeExpired };
+  global.RemoteCache = { TTL_MS, get, getMany, set, purgeExpired, clearAll };
 })(window);

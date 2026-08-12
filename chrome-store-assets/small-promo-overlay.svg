@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="280" viewBox="0 0 440 280">
+  <defs>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#07101f" stop-opacity="0.96"/>
+      <stop offset="0.58" stop-color="#07101f" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#07101f" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="440" height="280" fill="url(#fade)"/>
+  <text x="28" y="105" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.6">Where’s the</text>
+  <text x="28" y="134" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.6">remote?</text>
+  <text x="28" y="160" fill="#d8e2f0" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400">See what the job ad really says.</text>
+  <g transform="translate(28 180)">
+    <rect width="61" height="25" rx="12.5" fill="#45d483" fill-opacity="0.17" stroke="#45d483" stroke-opacity="0.72"/>
+    <circle cx="12" cy="12.5" r="3.5" fill="#45d483"/>
+    <text x="20" y="17" fill="#c8f9dc" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="700">REMOTE</text>
+  </g>
+  <g transform="translate(94 180)">
+    <rect width="61" height="25" rx="12.5" fill="#f4c95d" fill-opacity="0.15" stroke="#f4c95d" stroke-opacity="0.70"/>
+    <circle cx="12" cy="12.5" r="3.5" fill="#f4c95d"/>
+    <text x="20" y="17" fill="#ffe7a2" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="700">HYBRID</text>
+  </g>
+  <g transform="translate(160 180)">
+    <rect width="58" height="25" rx="12.5" fill="#ff8066" fill-opacity="0.15" stroke="#ff8066" stroke-opacity="0.70"/>
+    <circle cx="12" cy="12.5" r="3.5" fill="#ff8066"/>
+    <text x="20" y="17" fill="#ffc6ba" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="700">ONSITE</text>
+  </g>
+</svg>

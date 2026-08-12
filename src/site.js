@@ -87,6 +87,23 @@
     return unique(classic.concat(sdui, preference, viewCards));
   }
 
+  function linkedinFindConsentAnchors() {
+    // Before opt-in, inspect only the minimum structural signals needed to
+    // place the activation card. Do not clone or read card text and do not
+    // extract job IDs.
+    const classic = Array.from(document.querySelectorAll(LINKEDIN_CLASSIC_CARD_SELECTOR));
+    const preference = Array.from(document.querySelectorAll(LINKEDIN_PREFERENCE_CARD_SELECTOR)).filter(
+      isTopLevelLinkedinPreferenceCard
+    );
+    const viewCards = Array.from(document.querySelectorAll(LINKEDIN_VIEW_CARD_SELECTOR)).filter(
+      (card) => !card.closest(LINKEDIN_CLASSIC_CARD_SELECTOR)
+    );
+    const sdui = Array.from(document.querySelectorAll(LINKEDIN_SDUI_CARD_SELECTOR)).filter(
+      (card) => card.querySelector('img') && !card.closest(LINKEDIN_PREFERENCE_CARD_SELECTOR)
+    );
+    return unique(classic.concat(preference, viewCards, sdui));
+  }
+
   function linkedinCardsFor(jobId) {
     return linkedinFindCards().filter((card) => linkedinExtractJobId(card) === String(jobId));
   }
@@ -107,6 +124,7 @@
     platformName: 'LinkedIn',
     extractJobId: linkedinExtractJobId,
     findJobCardElements: linkedinFindCards,
+    findConsentAnchorElements: linkedinFindConsentAnchors,
     cardsFor: linkedinCardsFor,
     summaryPlacement: linkedinSummaryPlacement,
     cacheJobId(jobId) {
@@ -222,6 +240,7 @@
     platformName: 'Indeed',
     extractJobId: indeedExtractJobId,
     findJobCardElements: indeedFindCards,
+    findConsentAnchorElements: indeedFindCards,
     cardsFor: indeedCardsFor,
     platformLabelForCard: indeedPlatformLabelForCard,
     summaryPlacement: indeedSummaryPlacement,

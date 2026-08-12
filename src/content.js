@@ -45,6 +45,8 @@
   const FALLBACK_RESCAN_MS = 2500;
   const RECOVERY_RELOAD_KEY = 'ljc_last_context_recovery';
   const RECOVERY_RELOAD_COOLDOWN_MS = 15000;
+  const PRIVACY_POLICY_URL =
+    'https://seanrapsontravel-sketch.github.io/wheres-the-remote/privacy.html';
 
   const sessionResults = new Map(); // jobId -> classification state (final, this page load)
   const platformLabels = new Map(); // jobId -> job board's Remote/Hybrid/On-site label
@@ -52,27 +54,35 @@
   const queue = [];
   const queued = new Set();
   let running = 0;
-
-  // Drop classifications past their 14-day TTL, including ones for jobs the
-  // user will never see again — the per-job readers alone would never reach
-  // those. Failures are non-fatal: it's housekeeping, not part of the flow.
-  RemoteCache.purgeExpired().catch(() => {});
-
   let hideNonRemote = false;
-  RemoteSettings.getHideNonRemote().then((value) => {
-    hideNonRemote = value;
-    applyVisibilityToAllKnownCards();
-    updateAggregateSummary();
-  });
-  RemoteSettings.onHideNonRemoteChange((value) => {
-    hideNonRemote = value;
-    if (summaryEl && summaryEl.isConnected) {
-      const checkbox = summaryEl.querySelector('[data-ljc-hide-toggle]');
-      if (checkbox) checkbox.checked = hideNonRemote;
-    }
-    applyVisibilityToAllKnownCards();
-    updateAggregateSummary();
-  });
+  let consentState = 'loading';
+  let consentUiExpanded = true;
+  let grantedExperienceStarted = false;
+
+  async function startGrantedExperience() {
+    if (grantedExperienceStarted) return;
+    grantedExperienceStarted = true;
+
+    // Cache housekeeping and preferences both wait until consent. This keeps
+    // the disabled state genuinely idle: it only renders the activation card.
+    RemoteCache.purgeExpired().catch(() => {});
+    RemoteSettings.getHideNonRemote()
+      .then((value) => {
+        hideNonRemote = value;
+        applyVisibilityToAllKnownCards();
+        updateAggregateSummary();
+      })
+      .catch(() => {});
+    RemoteSettings.onHideNonRemoteChange((value) => {
+      hideNonRemote = value;
+      if (summaryEl && summaryEl.isConnected) {
+        const checkbox = summaryEl.querySelector('[data-ljc-hide-toggle]');
+        if (checkbox) checkbox.checked = hideNonRemote;
+      }
+      applyVisibilityToAllKnownCards();
+      updateAggregateSummary();
+    });
+  }
 
   function applyVisibilityToCards(jobId, state) {
     const hidden = RemoteFilter.shouldHide(state, hideNonRemote);
@@ -150,6 +160,12 @@
     return RemoteSite.findJobCardElements();
   }
 
+  function findConsentAnchorElements() {
+    return RemoteSite.findConsentAnchorElements
+      ? RemoteSite.findConsentAnchorElements()
+      : findJobCardElements();
+  }
+
   function cardsFor(jobId) {
     return RemoteSite.cardsFor(jobId);
   }
@@ -169,6 +185,168 @@
 
   let summaryEl = null;
 
+  function openPrivacyPolicy() {
+    window.open(PRIVACY_POLICY_URL, '_blank', 'noopener,noreferrer');
+  }
+
+  async function grantDataConsent() {
+    await RemoteSettings.setDataConsent('granted');
+    consentState = 'granted';
+    consentUiExpanded = false;
+    await startGrantedExperience();
+    if (summaryEl && summaryEl.isConnected) summaryEl.remove();
+    summaryEl = null;
+    scheduleScan();
+  }
+
+  async function declineDataConsent() {
+    await RemoteSettings.setDataConsent('declined');
+    consentState = 'declined';
+    consentUiExpanded = false;
+    updateAggregateSummary();
+  }
+
+  async function pauseRemoteChecks() {
+    await RemoteSettings.setDataConsent('declined');
+    consentState = 'declined';
+    consentUiExpanded = false;
+    // In-flight requests cannot reliably be recalled after fetch has started,
+    // but no new work will be pumped once consent changes. Previously-rendered
+    // local results stay visible until this lightweight reset removes them.
+    queue.length = 0;
+    queued.clear();
+    sessionResults.clear();
+    findJobCardElements().forEach((card) => {
+      card.querySelectorAll('[data-ljc-badge]').forEach((badge) => badge.remove());
+      RemoteFilter.applyVisibility(card, false);
+    });
+    if (summaryEl && summaryEl.isConnected) summaryEl.remove();
+    summaryEl = null;
+    updateAggregateSummary();
+  }
+
+  function renderConsentUi(el) {
+    el.classList.add('ljc-summary--consent');
+    el.removeAttribute('role');
+    el.removeAttribute('aria-live');
+
+    if (consentState === 'loading') {
+      el.innerHTML = `
+        <div class="ljc-summary__header">
+          <span class="ljc-summary__title">Where's the remote?</span>
+          <span class="ljc-summary__progress">Getting ready…</span>
+        </div>`;
+      return;
+    }
+
+    if (consentState === 'declined' && !consentUiExpanded) {
+      el.innerHTML = `
+        <div class="ljc-consent-compact">
+          <span><strong>Remote checking is off.</strong> No job descriptions are being sent.</span>
+          <button type="button" class="ljc-consent-button ljc-consent-button--primary" data-ljc-consent-expand>
+            Enable remote checks
+          </button>
+        </div>`;
+      el.querySelector('[data-ljc-consent-expand]').addEventListener('click', () => {
+        consentUiExpanded = true;
+        updateAggregateSummary();
+      });
+      return;
+    }
+
+    el.innerHTML = `
+      <div class="ljc-summary__header">
+        <span class="ljc-summary__title">Where's the remote?</span>
+        <span class="ljc-consent-eyebrow">One-time setup</span>
+      </div>
+      <div class="ljc-consent-heading">See which jobs are genuinely remote</div>
+      <div class="ljc-consent-copy">
+        To classify postings, up to 8,000 characters of each job description and a random
+        installation ID are sent securely to our Cloudflare service and OpenAI. Results are
+        saved on this device for 14 days so the same job doesn't need to be sent repeatedly.
+      </div>
+      <div class="ljc-consent-actions">
+        <button type="button" class="ljc-consent-button ljc-consent-button--primary" data-ljc-consent-enable>
+          Enable remote checks
+        </button>
+        <button type="button" class="ljc-consent-button ljc-consent-button--secondary" data-ljc-consent-decline>
+          Not now
+        </button>
+        <button type="button" class="ljc-consent-link" data-ljc-privacy>How your data is handled</button>
+      </div>`;
+
+    const enable = el.querySelector('[data-ljc-consent-enable]');
+    const decline = el.querySelector('[data-ljc-consent-decline]');
+    enable.addEventListener('click', async () => {
+      enable.disabled = true;
+      decline.disabled = true;
+      enable.textContent = 'Enabling…';
+      try {
+        await grantDataConsent();
+      } catch (err) {
+        enable.disabled = false;
+        decline.disabled = false;
+        enable.textContent = 'Enable remote checks';
+      }
+    });
+    decline.addEventListener('click', () => declineDataConsent().catch(() => {}));
+    el.querySelector('[data-ljc-privacy]').addEventListener('click', openPrivacyPolicy);
+  }
+
+  function renderSummaryUi(el) {
+    el.classList.remove('ljc-summary--consent');
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.innerHTML = `
+      <div class="ljc-summary__header">
+        <span class="ljc-summary__title">Remote reality</span>
+        <span class="ljc-summary__progress"></span>
+      </div>
+      <div class="ljc-summary__stats">
+        <span class="ljc-summary__stat ljc-summary__stat--remote"></span>
+        <span class="ljc-summary__stat ljc-summary__stat--travel"></span>
+        <span class="ljc-summary__stat ljc-summary__stat--office"></span>
+        <span class="ljc-summary__stat ljc-summary__stat--unclear"></span>
+      </div>
+      <div class="ljc-summary__filter">
+        <label>
+          <input type="checkbox" data-ljc-hide-toggle />
+          Hide hybrid &amp; non-remote roles
+        </label>
+      </div>
+      <div class="ljc-summary__insight"></div>
+      <div class="ljc-summary__controls">
+        <button type="button" data-ljc-pause>Pause remote checks</button>
+        <span aria-hidden="true">·</span>
+        <button type="button" data-ljc-clear>Clear saved results</button>
+        <span aria-hidden="true">·</span>
+        <button type="button" data-ljc-privacy>Privacy</button>
+      </div>`;
+
+    const checkbox = el.querySelector('[data-ljc-hide-toggle]');
+    checkbox.checked = hideNonRemote;
+    checkbox.addEventListener('change', () => {
+      hideNonRemote = checkbox.checked;
+      RemoteSettings.setHideNonRemote(hideNonRemote);
+      applyVisibilityToAllKnownCards();
+      updateAggregateSummary();
+    });
+    el.querySelector('[data-ljc-pause]').addEventListener('click', () =>
+      pauseRemoteChecks().catch(() => {})
+    );
+    el.querySelector('[data-ljc-clear]').addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        await RemoteCache.clearAll();
+        button.textContent = 'Saved results cleared';
+      } catch (err) {
+        button.disabled = false;
+      }
+    });
+    el.querySelector('[data-ljc-privacy]').addEventListener('click', openPrivacyPolicy);
+  }
+
   function ensureSummaryEl(cards) {
     const firstCard = cards && cards[0];
     if (!firstCard || !firstCard.parentElement) {
@@ -186,41 +364,21 @@
     summaryEl = document.createElement(parent.tagName === 'UL' || parent.tagName === 'OL' ? 'li' : 'div');
     summaryEl.setAttribute('data-ljc-summary', 'true');
     summaryEl.className = 'ljc-summary';
-    summaryEl.setAttribute('role', 'status');
-    summaryEl.setAttribute('aria-live', 'polite');
-    summaryEl.innerHTML = `
-      <div class="ljc-summary__header">
-        <span class="ljc-summary__title">Remote reality</span>
-        <span class="ljc-summary__progress"></span>
-      </div>
-      <div class="ljc-summary__stats">
-        <span class="ljc-summary__stat ljc-summary__stat--remote"></span>
-        <span class="ljc-summary__stat ljc-summary__stat--travel"></span>
-        <span class="ljc-summary__stat ljc-summary__stat--office"></span>
-        <span class="ljc-summary__stat ljc-summary__stat--unclear"></span>
-      </div>
-      <div class="ljc-summary__filter">
-        <label>
-          <input type="checkbox" data-ljc-hide-toggle />
-          Hide hybrid &amp; non-remote roles
-        </label>
-      </div>
-      <div class="ljc-summary__insight"></div>`;
     parent.insertBefore(summaryEl, anchor);
-
-    const checkbox = summaryEl.querySelector('[data-ljc-hide-toggle]');
-    checkbox.checked = hideNonRemote;
-    checkbox.addEventListener('change', () => {
-      hideNonRemote = checkbox.checked;
-      RemoteSettings.setHideNonRemote(hideNonRemote);
-      applyVisibilityToAllKnownCards();
-      updateAggregateSummary();
-    });
+    if (consentState === 'granted') renderSummaryUi(summaryEl);
+    else renderConsentUi(summaryEl);
 
     return summaryEl;
   }
 
   function updateAggregateSummary(cards) {
+    if (consentState !== 'granted') {
+      const consentAnchors = cards || findConsentAnchorElements();
+      const consentEl = ensureSummaryEl(consentAnchors);
+      if (consentEl) renderConsentUi(consentEl);
+      return;
+    }
+
     const currentCards = cards || findJobCardElements();
     const unique = new Map();
 
@@ -240,6 +398,10 @@
       )
     );
     if (!el) return;
+
+    // A summary element may have existed as the consent card immediately
+    // before the user enabled checking. Swap its contents in place.
+    if (!el.querySelector('.ljc-summary__stats')) renderSummaryUi(el);
 
     const summary = RemoteAggregate.summarize(Array.from(unique.values()));
     const failedText = summary.errors ? ` · ${summary.errors} failed` : '';
@@ -268,8 +430,10 @@
   }
 
   async function runJob(jobId) {
+    if (consentState !== 'granted') return;
     try {
       const description = await RemoteExtractor.fetchDescription(jobId);
+      if (consentState !== 'granted') return;
       if (!description) {
         applyState(jobId, { status: 'error' });
         return;
@@ -297,7 +461,7 @@
   }
 
   function pump() {
-    while (running < MAX_CONCURRENT && queue.length > 0) {
+    while (consentState === 'granted' && running < MAX_CONCURRENT && queue.length > 0) {
       const jobId = queue.shift();
       queued.delete(jobId);
       running++;
@@ -311,6 +475,7 @@
   }
 
   function enqueue(jobId) {
+    if (consentState !== 'granted') return;
     if (inFlight.has(jobId) || queued.has(jobId)) return;
     queued.add(jobId);
     queue.push(jobId);
@@ -318,6 +483,7 @@
   }
 
   async function processCard(card) {
+    if (consentState !== 'granted') return;
     const jobId = RemoteSite.extractJobId(card);
     if (!jobId) return;
     rememberPlatformLabel(jobId, card);
@@ -356,6 +522,10 @@
 
   function scan() {
     if (torndown) return;
+    if (consentState !== 'granted') {
+      updateAggregateSummary(findConsentAnchorElements());
+      return;
+    }
     const cards = findJobCardElements();
     cards.forEach((card) => {
       if (card.querySelector('[data-ljc-badge]')) return; // already badged
@@ -403,5 +573,28 @@
   const fallbackIntervalId = setInterval(scheduleScan, FALLBACK_RESCAN_MS);
 
   // Initial pass.
-  scheduleScan();
+  RemoteSettings.onDataConsentChange((value) => {
+    if (value === 'granted' && consentState !== 'granted') {
+      consentState = 'granted';
+      consentUiExpanded = false;
+      startGrantedExperience().then(scheduleScan).catch(() => {});
+      return;
+    }
+    if (value !== 'granted' && consentState === 'granted') {
+      pauseRemoteChecks().catch(() => {});
+    }
+  });
+
+  RemoteSettings.getDataConsent()
+    .then(async (value) => {
+      consentState = value || 'unset';
+      consentUiExpanded = value !== 'declined';
+      if (consentState === 'granted') await startGrantedExperience();
+      scheduleScan();
+    })
+    .catch(() => {
+      consentState = 'unset';
+      consentUiExpanded = true;
+      scheduleScan();
+    });
 })();
