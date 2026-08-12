@@ -149,8 +149,10 @@ async function handleClassify(request, env) {
     return json({ error: 'Classification service is not configured.' }, 503);
   }
 
-  // Free header checks first, so malformed traffic can't burn the quota that
-  // real users need.
+  // Header checks first: they cost nothing to evaluate and reject traffic that
+  // was never going to be a classification request, without spending a
+  // limiter round-trip on it. Volumetric floods of this shape are Cloudflare's
+  // job, not ours — there is no body to read and no OpenAI call behind it.
   if (!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json')) {
     return json({ error: 'Content-Type must be application/json.' }, 415);
   }
