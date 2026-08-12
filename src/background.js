@@ -14,6 +14,7 @@ const REQUEST_TIMEOUT_MS = 20000;
 const MAX_DESCRIPTION_CHARS = 8000;
 const INSTALL_ID_KEY = 'ljcInstallId';
 const INSTALL_ID_HEADER = 'X-Install-Id';
+const DATA_CONSENT_KEY = 'ljcDataConsentV1';
 
 /**
  * A random per-installation identifier, so the Worker can meter usage per
@@ -80,6 +81,16 @@ function withTimeout(request, ms) {
 async function classifyWithLLM(description) {
   const truncated = String(description || '').slice(0, MAX_DESCRIPTION_CHARS);
   if (!truncated.trim()) throw new Error('No job description was supplied.');
+
+  // Defence in depth: content.js also gates extraction and classification,
+  // but the service worker is the only component capable of transmitting the
+  // description. It independently refuses to create/send an installation ID
+  // or make a network request until this device has recorded affirmative
+  // consent for the current disclosure version.
+  const consent = await chrome.storage.local.get(DATA_CONSENT_KEY);
+  if (consent[DATA_CONSENT_KEY] !== 'granted') {
+    throw new Error('Remote checking has not been enabled.');
+  }
 
   const endpoint = workerEndpoint();
   const id = await installId();

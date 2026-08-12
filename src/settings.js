@@ -7,6 +7,8 @@
  */
 (function (global) {
   const HIDE_NON_REMOTE_KEY = 'ljc_hide_non_remote';
+  const DATA_CONSENT_KEY = 'ljcDataConsentV1';
+  const DATA_CONSENT_STATES = new Set(['granted', 'declined']);
 
   async function getHideNonRemote() {
     const stored = await chrome.storage.sync.get(HIDE_NON_REMOTE_KEY);
@@ -24,5 +26,40 @@
     });
   }
 
-  global.RemoteSettings = { getHideNonRemote, setHideNonRemote, onHideNonRemoteChange };
+  /**
+   * Classification consent is deliberately local rather than synced. Consent
+   * given on one Chrome installation must not silently enable transmission on
+   * another device. The version is part of the key so a material future change
+   * can require a fresh decision without overwriting the record for this flow.
+   */
+  async function getDataConsent() {
+    const stored = await chrome.storage.local.get(DATA_CONSENT_KEY);
+    const value = stored[DATA_CONSENT_KEY];
+    return DATA_CONSENT_STATES.has(value) ? value : null;
+  }
+
+  async function setDataConsent(value) {
+    if (!DATA_CONSENT_STATES.has(value)) {
+      throw new TypeError('Data consent must be "granted" or "declined".');
+    }
+    await chrome.storage.local.set({ [DATA_CONSENT_KEY]: value });
+  }
+
+  function onDataConsentChange(callback) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes[DATA_CONSENT_KEY]) return;
+      const value = changes[DATA_CONSENT_KEY].newValue;
+      callback(DATA_CONSENT_STATES.has(value) ? value : null);
+    });
+  }
+
+  global.RemoteSettings = {
+    DATA_CONSENT_KEY,
+    getHideNonRemote,
+    setHideNonRemote,
+    onHideNonRemoteChange,
+    getDataConsent,
+    setDataConsent,
+    onDataConsentChange,
+  };
 })(window);

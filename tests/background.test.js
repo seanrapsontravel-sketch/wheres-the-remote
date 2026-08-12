@@ -67,6 +67,21 @@ function send(message) {
 }
 
 (async () => {
+  // The network boundary must fail closed before consent. In particular, the
+  // random install ID must not even be created while remote checks are off.
+  const beforeConsent = await send({
+    type: 'LJC_CLASSIFY_LLM',
+    description: 'This is a fully remote role with no office requirement.',
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(beforeConsent)), {
+    ok: false,
+    error: 'Remote checking has not been enabled.',
+  });
+  assert.equal(outgoingRequest, undefined);
+  assert.equal(storage.ljcInstallId, undefined);
+
+  storage.ljcDataConsentV1 = 'granted';
+
   const result = await send({
     type: 'LJC_CLASSIFY_LLM',
     description: 'This is a fully remote role with no office requirement.',
