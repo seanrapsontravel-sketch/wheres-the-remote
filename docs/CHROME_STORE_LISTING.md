@@ -5,11 +5,10 @@ practices" tabs. Nothing here needs to ship inside the extension package.
 
 ## Privacy policy URL
 
-Enable GitHub Pages for this repo (Settings → Pages → Deploy from branch →
-`main` → `/docs`), then use:
+Live (GitHub Pages, deploying from `main` / `/docs`):
 
 ```
-https://<your-github-username>.github.io/<repo-name>/privacy.html
+https://seanrapsontravel-sketch.github.io/wheres-the-remote/privacy.html
 ```
 
 ## Single purpose description
