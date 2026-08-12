@@ -106,10 +106,17 @@
       return;
     }
 
+    // A failure must never be mistakable for a result. This previously
+    // rendered '⚪ NOT STATED' — the exact pill the genuine UNCLEAR category
+    // uses — so a job whose description could not be read looked identical to
+    // one that was read and simply didn't say. That hid a period where four
+    // jobs in five were failing, and it silently answers the user's actual
+    // question ("is this remote?") with a guess.
     if (state.status === 'error') {
       badge.classList.add('ljc-badge--error');
-      pill.textContent = '⚪ NOT STATED';
-      reasonEl.textContent = 'Could not load the job description.';
+      pill.textContent = '⚠️ COULDN’T CHECK';
+      reasonEl.textContent = 'The job description could not be loaded.';
+      badge.title = 'The job description could not be loaded, so this posting was not classified.';
       return;
     }
 

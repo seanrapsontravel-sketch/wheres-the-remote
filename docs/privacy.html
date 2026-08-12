@@ -15,7 +15,7 @@
 <body>
 
 <h1>Privacy Policy — Where's the remote?</h1>
-<p class="updated">Last updated: 12 August 2026</p>
+<p class="updated">Last updated: 12 August 2026 (revision 2)</p>
 
 <p>"Where's the remote?" is a Chrome extension that reads job postings on
 LinkedIn and Indeed and shows whether a role is genuinely remote, hybrid,
@@ -24,32 +24,84 @@ rather than the platform's own label. This page explains what data the
 extension handles and why.</p>
 
 <h2>What data is read</h2>
-<p>While you browse supported LinkedIn and Indeed job pages, the extension
-reads the text of job postings visible on the page (title and description).
-It does not read any other page content, and it does not run on any site
-other than LinkedIn and Indeed.</p>
+<p>The extension runs only on LinkedIn and Indeed job pages. It does not run
+on, or read, any other site. On those pages it reads:</p>
+<ul>
+  <li><strong>The job cards in the results list</strong> — the extension reads
+  the full text of each card in order to identify the listing and pick up the
+  platform's own "Remote"/"Hybrid"/"On-site" label. In practice a card is the
+  job title, company, location and label.</li>
+  <li><strong>The full job posting page</strong> — to get the description, the
+  extension loads the posting in a hidden frame and reads the rendered page
+  text. It looks for the description section, and reads the rest of the page
+  text only to detect an expired or unavailable posting.</li>
+</ul>
+<p>It does not read your LinkedIn or Indeed account details, your messages,
+your connections, your saved or applied jobs, or any page outside the job
+sections of those two sites.</p>
 
 <h2>What data is sent off your device</h2>
 <p>To classify a job posting, the extension sends that posting's description
-text to our backend — a Cloudflare Worker we operate — which forwards it to
-OpenAI's API to determine the classification. Only the description text
-needed to classify that one posting is sent. No LinkedIn/Indeed account
-details, browsing history, cookies, or other personal information are
-collected or transmitted.</p>
+text (up to 8,000 characters) to our backend — a Cloudflare Worker we operate
+— which forwards it to OpenAI's API to determine the classification. Alongside
+it, the extension sends a random identifier generated on your device when the
+extension is installed. This identifier exists purely so we can limit how many
+classification requests a single installation can make, protecting the service
+from abuse. It is a random value, is not derived from you or your device, and
+is not linked to any account. We never share its raw value with anyone; it is
+passed to OpenAI only as an irreversible hash, as an abuse-reporting
+reference.</p>
 
-<p>The Worker is stateless: it does not log or store the description text or
-the classification result. It simply relays the request to OpenAI, validates
-the response, and returns it to the extension. OpenAI's API does not use data
-submitted via its API to train its models by default.</p>
+<p>Nothing else is sent. No LinkedIn or Indeed account details, browsing
+history, cookies, page URLs, search terms or the platform's own labels leave
+your device.</p>
 
-<h2>What's stored locally</h2>
+<p>One caveat we want to be explicit about: job descriptions are written by
+employers and recruiters, not by us, and a description sometimes contains
+personal details such as a hiring manager's name, an email address or a phone
+number. When it does, that text is part of what gets sent for classification.
+We do not extract, store or use such details, but we cannot remove them from
+a description before it is classified.</p>
+
+<p>The Worker is stateless: its own code does not log or store the description
+text, the classification result, or your installation identifier. It relays the
+request to OpenAI, validates the response, and returns it. The one record it
+writes per request is a count of tokens — the units of text a language model
+processes — so we can monitor cost and detect abuse. That record contains no
+description text, no classification result, and nothing identifying where the
+request came from.</p>
+
+<p>Separately from the Worker's own code, we have Cloudflare's operational
+logging switched on for it. That is a platform feature rather than something
+we write: it records metadata about each request, which can include request
+headers and therefore the installation identifier described above. We use it
+only to monitor the service's cost, errors and availability. Requests also
+pass through Cloudflare's standard network logging.</p>
+
+<p>OpenAI does not use data submitted through its API to train its models by
+default. OpenAI does retain API inputs and outputs for a limited period — up to
+30 days under its standard policy — for abuse monitoring, after which they are
+deleted, except where OpenAI is required by law to retain them for longer.</p>
+
+<h2>What's stored on your device</h2>
 <p>Once a job posting has been classified, the result (category, a short
 reason, and, if relevant, how often office attendance is required) is cached
-on your device using Chrome's local storage (<code>chrome.storage.local</code>)
-for 14 days, keyed to that job listing. This avoids re-classifying the same
-listing every time you see it. This cache never leaves your device and is
-removed automatically after 14 days, or immediately if you uninstall the
-extension.</p>
+using Chrome's local storage (<code>chrome.storage.local</code>) for 14 days,
+keyed to that job listing, so the same listing isn't re-classified every time
+you see it. Entries past 14 days are deleted when the extension next runs.
+These cached classifications are never transmitted anywhere — they are only
+read back on your own device. The random installation identifier described
+above is stored in the same place, but unlike the cache it <em>is</em> sent
+with each classification request, as described in the previous section. All of
+it is removed if you uninstall the extension.</p>
+
+<p>Your "hide hybrid &amp; non-remote roles" preference is stored using
+Chrome's synced storage (<code>chrome.storage.sync</code>). This means that if
+you are signed in to Chrome with sync enabled, this single on/off setting is
+synced to your Google account and to your other signed-in Chrome
+installations, the same way your bookmarks are. It is handled by Google, not
+by us — we never see it. No other data is synced. Disabling extension sync in
+Chrome's settings keeps it local to the device.</p>
 
 <h2>What we don't do</h2>
 <ul>
@@ -57,13 +109,22 @@ extension.</p>
   <li>We don't use the data for any purpose beyond providing the extension's single feature.</li>
   <li>We don't track you across sites, build user profiles, or use analytics/ad SDKs in the extension.</li>
   <li>We don't require or collect any account, email, or sign-in information.</li>
+  <li>We don't record which jobs you looked at, searched for, or applied to.</li>
 </ul>
 
 <h2>Third parties involved</h2>
 <ul>
   <li><strong>Cloudflare</strong> hosts the relay Worker that forwards requests to OpenAI. Requests pass through Cloudflare's standard infrastructure logging, subject to <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</li>
   <li><strong>OpenAI</strong> processes the submitted job description text to return a classification, subject to <a href="https://openai.com/policies/privacy-policy">OpenAI's privacy policy</a>.</li>
+  <li><strong>Google</strong> synchronises the single hide-roles preference if you use Chrome with sync enabled, subject to <a href="https://policies.google.com/privacy">Google's privacy policy</a>.</li>
 </ul>
+
+<h2>Changes to this policy</h2>
+<p>If the extension's data handling changes, this page is updated and the
+"last updated" date above changes with it. Material changes — anything that
+newly collects, transmits or shares data, or uses existing data for a new
+purpose — will be described here before the version that makes the change is
+released.</p>
 
 <h2>Contact</h2>
 <p>Questions about this policy can be sent to

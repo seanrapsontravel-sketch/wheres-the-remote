@@ -21,20 +21,27 @@ https://seanrapsontravel-sketch.github.io/wheres-the-remote/privacy.html
 ## Permission justifications
 
 **storage**
-> Caches each job listing's classification result locally
-> (`chrome.storage.local`) for 14 days, keyed by job ID, so a listing already
-> analyzed isn't re-sent for classification on revisits, pagination, or a
-> later search. Only the classification result is stored — no personal data.
+> Three things, all minimal. (1) Each job listing's classification result is
+> cached locally (`chrome.storage.local`) for 14 days, keyed by job ID, so a
+> listing already analyzed isn't re-sent for classification on revisits,
+> pagination, or a later search; expired entries are deleted. (2) A random
+> identifier generated at install time is stored locally and sent with
+> classification requests so the backend can rate-limit each installation;
+> it is not derived from the user or device and is linked to no account.
+> (3) The single "hide hybrid & non-remote roles" on/off preference is stored
+> in `chrome.storage.sync` so it follows the user across their signed-in
+> Chrome installations. No job data, browsing history, or personal data is
+> stored in either area.
 
 **scripting**
 > Used only to re-inject the extension's own already-declared content
 > scripts (`src/site.js`, `src/classifier.js`, `src/cache.js`,
-> `src/extractor.js`, `src/badge.js`, `src/aggregate.js`, `src/content.js`,
-> `src/badge.css`) into LinkedIn/Indeed job tabs that were already open when
-> the extension is installed, updated, or the browser restarts, since Chrome
-> does not automatically retrofit content scripts into existing tabs. No
-> remote or dynamically generated code is ever injected — only the
-> extension's own bundled files.
+> `src/extractor.js`, `src/badge.js`, `src/aggregate.js`, `src/settings.js`,
+> `src/filter.js`, `src/content.js`, `src/badge.css`) into LinkedIn/Indeed
+> job tabs that were already open when the extension is installed, updated,
+> or the browser restarts, since Chrome does not automatically retrofit
+> content scripts into existing tabs. No remote or dynamically generated code
+> is ever injected — only the extension's own bundled files.
 
 **host permission: `https://www.linkedin.com/*`**
 > Required for the content script to run on LinkedIn job search and job
@@ -67,14 +74,39 @@ https://seanrapsontravel-sketch.github.io/wheres-the-remote/privacy.html
 
 ## Data usage disclosure (Privacy practices tab)
 
-- **Data collected:** Website content (the text of job postings on
-  LinkedIn/Indeed pages you visit).
+Tick **Website content** only. Everything below must stay consistent with
+`docs/privacy.html` — the dashboard disclosure and the policy are checked
+against each other, and against what the code actually does.
+
+- **Data collected:** Website content — the text of job cards in LinkedIn/
+  Indeed search results, and the text of the job posting pages themselves.
+  The posting's description is transmitted for classification; the rest is
+  read on-device only, to identify the listing and detect expired postings.
 - **Purpose:** App functionality only — classifying the currently viewed job
   posting.
 - **Sold to third parties:** No.
 - **Used for purposes unrelated to the extension's single purpose:** No.
 - **Used to determine creditworthiness or for lending:** No.
 - Certify: data handling matches this disclosure.
+
+Two points to be ready to answer on, since both have tripped up reviews:
+
+- **Job descriptions can incidentally contain personal information** (a hiring
+  manager's name, an email address, a phone number) because employers write
+  them. That text is transmitted as part of the description. The extension
+  does not extract, store or use it. `docs/privacy.html` says this explicitly
+  rather than claiming that no personal information is ever transmitted.
+- **The install identifier is not "user data"** in the sense the form means:
+  it is a random value created on the device, used solely to rate-limit the
+  backend, and tied to nothing else. It is still disclosed in the privacy
+  policy, because Chrome expects all collection to be disclosed, and because
+  a reviewer who sees an identifier header and no mention of it in the policy
+  will reasonably assume the worst.
+
+If a later version changes any of this, update `docs/privacy.html` **and**
+this tab in the same release. Chrome requires practice changes to be
+disclosed prominently, and a policy that lags the shipped behaviour is
+grounds for removal, not just rejection.
 
 ## "Does your extension use remote code?"
 

@@ -10,13 +10,29 @@
 (function () {
   // Must match EXTRACTOR_FRAME_NAME in extractor.js. The extractor points its
   // own hidden iframe at a real board URL that can itself contain job cards
-  // (see the comment on EXTRACTOR_FRAME_NAME), which content_scripts'
-  // all_frames:true would otherwise inject this whole orchestrator into,
-  // recursively spawning further extraction iframes. Bail out before doing
-  // anything else if this document is one of our own extraction frames.
+  // (see the comment on EXTRACTOR_FRAME_NAME), so anything that injects this
+  // orchestrator into subframes makes it recursively spawn further extraction
+  // iframes. The manifest no longer sets all_frames, which is the real fix;
+  // this guard stays as a cheap backstop against that setting coming back.
   if (window.name === 'LJC_EXTRACTOR_FRAME') return;
 
-  if (!window.RemoteSite) return;
+  // A partial injection — a stale recovery file list, a script that failed to
+  // parse — would otherwise throw partway through setup and leave the page
+  // half-wired. Fail quietly instead; the next real navigation re-injects the
+  // full set declaratively. Keep this list in step with the manifest's
+  // content_scripts, which tests/recovery.test.js pins recovery.js to.
+  if (
+    !window.RemoteSite ||
+    !window.RemoteClassifier ||
+    !window.RemoteCache ||
+    !window.RemoteExtractor ||
+    !window.RemoteBadge ||
+    !window.RemoteAggregate ||
+    !window.RemoteSettings ||
+    !window.RemoteFilter
+  ) {
+    return;
+  }
 
   // Declarative injection and the service-worker recovery path can race when
   // an existing tab is restored. Only one orchestrator should own the page's
@@ -36,6 +52,36 @@
   const queue = [];
   const queued = new Set();
   let running = 0;
+
+  // Drop classifications past their 14-day TTL, including ones for jobs the
+  // user will never see again — the per-job readers alone would never reach
+  // those. Failures are non-fatal: it's housekeeping, not part of the flow.
+  RemoteCache.purgeExpired().catch(() => {});
+
+  let hideNonRemote = false;
+  RemoteSettings.getHideNonRemote().then((value) => {
+    hideNonRemote = value;
+    applyVisibilityToAllKnownCards();
+    updateAggregateSummary();
+  });
+  RemoteSettings.onHideNonRemoteChange((value) => {
+    hideNonRemote = value;
+    if (summaryEl && summaryEl.isConnected) {
+      const checkbox = summaryEl.querySelector('[data-ljc-hide-toggle]');
+      if (checkbox) checkbox.checked = hideNonRemote;
+    }
+    applyVisibilityToAllKnownCards();
+    updateAggregateSummary();
+  });
+
+  function applyVisibilityToCards(jobId, state) {
+    const hidden = RemoteFilter.shouldHide(state, hideNonRemote);
+    cardsFor(jobId).forEach((card) => RemoteFilter.applyVisibility(card, hidden));
+  }
+
+  function applyVisibilityToAllKnownCards() {
+    sessionResults.forEach((state, jobId) => applyVisibilityToCards(jobId, state));
+  }
 
   // Reloading the extension (e.g. during development) orphans any content
   // script already injected into an open tab: it keeps running, but every
@@ -153,8 +199,24 @@
         <span class="ljc-summary__stat ljc-summary__stat--office"></span>
         <span class="ljc-summary__stat ljc-summary__stat--unclear"></span>
       </div>
+      <div class="ljc-summary__filter">
+        <label>
+          <input type="checkbox" data-ljc-hide-toggle />
+          Hide hybrid &amp; non-remote roles
+        </label>
+      </div>
       <div class="ljc-summary__insight"></div>`;
     parent.insertBefore(summaryEl, anchor);
+
+    const checkbox = summaryEl.querySelector('[data-ljc-hide-toggle]');
+    checkbox.checked = hideNonRemote;
+    checkbox.addEventListener('change', () => {
+      hideNonRemote = checkbox.checked;
+      RemoteSettings.setHideNonRemote(hideNonRemote);
+      applyVisibilityToAllKnownCards();
+      updateAggregateSummary();
+    });
+
     return summaryEl;
   }
 
@@ -186,15 +248,18 @@
     el.querySelector('.ljc-summary__stat--travel').textContent = `🟡 Remote + travel ${summary.remoteTravel}`;
     el.querySelector('.ljc-summary__stat--office').textContent = `🟠 Office required ${summary.officeRequired}`;
     el.querySelector('.ljc-summary__stat--unclear').textContent = `⚪ Not stated ${summary.notStated}`;
-    el.querySelector('.ljc-summary__insight').textContent = RemoteAggregate.remoteInsight(
-      summary,
-      RemoteSite.platformName
-    );
+    const hiddenText = hideNonRemote ? ` · 🙈 ${summary.officeRequired} hidden` : '';
+    el.querySelector('.ljc-summary__insight').textContent =
+      RemoteAggregate.remoteInsight(summary, RemoteSite.platformName) + hiddenText;
+
+    const checkbox = el.querySelector('[data-ljc-hide-toggle]');
+    if (checkbox) checkbox.checked = hideNonRemote;
   }
 
   function applyState(jobId, state) {
     sessionResults.set(jobId, state);
     cardsFor(jobId).forEach((card) => RemoteBadge.render(card, state));
+    applyVisibilityToCards(jobId, state);
     updateAggregateSummary();
   }
 
@@ -258,7 +323,9 @@
     rememberPlatformLabel(jobId, card);
 
     if (sessionResults.has(jobId)) {
-      RemoteBadge.render(card, sessionResults.get(jobId));
+      const state = sessionResults.get(jobId);
+      RemoteBadge.render(card, state);
+      RemoteFilter.applyVisibility(card, RemoteFilter.shouldHide(state, hideNonRemote));
       updateAggregateSummary();
       return;
     }
@@ -279,6 +346,7 @@
       const state = { status: 'done', category: cached.category, reason: cached.reason, cadence: cached.cadence };
       sessionResults.set(jobId, state);
       cardsFor(jobId).forEach((c) => RemoteBadge.render(c, state));
+      applyVisibilityToCards(jobId, state);
       updateAggregateSummary();
       return;
     }

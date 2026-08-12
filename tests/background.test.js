@@ -7,6 +7,8 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'
 let messageListener;
 let outgoingRequest;
 
+const storage = {};
+
 const sandbox = {
   self: {
     RemoteClassifierConfig: {
@@ -14,11 +16,22 @@ const sandbox = {
     },
   },
   importScripts() {},
+  crypto,
   chrome: {
     runtime: {
       onMessage: {
         addListener(listener) {
           messageListener = listener;
+        },
+      },
+    },
+    storage: {
+      local: {
+        async get(key) {
+          return key in storage ? { [key]: storage[key] } : {};
+        },
+        async set(items) {
+          Object.assign(storage, items);
         },
       },
     },
@@ -75,6 +88,28 @@ function send(message) {
     JSON.parse(outgoingRequest.options.body).description,
     'This is a fully remote role with no office requirement.'
   );
+
+  // The Worker meters per installation, so the id has to be sent, has to be
+  // a UUID the Worker will accept, and has to be persisted rather than
+  // regenerated per request — a rotating id would defeat the quota.
+  const sentId = outgoingRequest.options.headers['X-Install-Id'];
+  assert.match(sentId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  assert.equal(storage.ljcInstallId, sentId);
+  assert.ok(
+    !Object.keys(storage).some((key) => key.startsWith('ljc_')),
+    'the install id must sit outside the ljc_ cache namespace RemoteCache sweeps'
+  );
+
+  await send({ type: 'LJC_CLASSIFY_LLM', description: 'Another fully remote role, no office.' });
+  assert.equal(outgoingRequest.options.headers['X-Install-Id'], sentId);
+
+  // The service worker caps the description independently of the content
+  // script, so a caller that bypasses classifier.js still can't send an
+  // oversized body the Worker would only reject with a 413.
+  const huge = 'Fully remote. '.repeat(2000);
+  assert.ok(huge.length > 8000);
+  await send({ type: 'LJC_CLASSIFY_LLM', description: huge });
+  assert.equal(JSON.parse(outgoingRequest.options.body).description.length, 8000);
 
   console.log('Background proxy tests passed.');
 })().catch((error) => {

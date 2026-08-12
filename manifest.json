@@ -25,7 +25,6 @@
         "https://www.linkedin.com/preload/*",
         "https://*.indeed.com/*"
       ],
-      "all_frames": true,
       "js": [
         "src/site.js",
         "src/classifier.js",
@@ -33,6 +32,8 @@
         "src/extractor.js",
         "src/badge.js",
         "src/aggregate.js",
+        "src/settings.js",
+        "src/filter.js",
         "src/content.js"
       ],
       "css": ["src/badge.css"],

@@ -12,6 +12,44 @@ importScripts('config.js');
 const ALLOWED_CATEGORIES = ['TRUE_REMOTE', 'REMOTE_TRAVEL', 'HYBRID', 'NOT_REMOTE', 'UNCLEAR'];
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_DESCRIPTION_CHARS = 8000;
+const INSTALL_ID_KEY = 'ljcInstallId';
+const INSTALL_ID_HEADER = 'X-Install-Id';
+
+/**
+ * A random per-installation identifier, so the Worker can meter usage per
+ * install rather than per IP — IPs are shared behind NAT and trivially
+ * rotated by anyone abusing the endpoint.
+ *
+ * This is a v4 UUID generated on the device and never linked to an account,
+ * profile or anything the user typed. It is not a credential: it identifies
+ * a bucket, not a permission, and the endpoint stays anonymous.
+ *
+ * Deliberately NOT prefixed `ljc_` — RemoteCache.purgeExpired() sweeps that
+ * namespace in chrome.storage.local.
+ */
+let installIdPromise = null;
+
+function installId() {
+  if (installIdPromise) return installIdPromise;
+
+  installIdPromise = (async () => {
+    const stored = await chrome.storage.local.get(INSTALL_ID_KEY);
+    const existing = stored[INSTALL_ID_KEY];
+    if (typeof existing === 'string' && existing) return existing;
+
+    const created = crypto.randomUUID();
+    await chrome.storage.local.set({ [INSTALL_ID_KEY]: created });
+    return created;
+  })().catch(() => {
+    // Storage can fail (quota, a profile in an odd state). Classification is
+    // the user-visible feature and must not break over a metering key, so
+    // fall back to an id that lives as long as this service worker does.
+    installIdPromise = null;
+    return crypto.randomUUID();
+  });
+
+  return installIdPromise;
+}
 
 function workerEndpoint() {
   const configured = self.RemoteClassifierConfig && self.RemoteClassifierConfig.workerUrl;
@@ -43,12 +81,18 @@ async function classifyWithLLM(description) {
   const truncated = String(description || '').slice(0, MAX_DESCRIPTION_CHARS);
   if (!truncated.trim()) throw new Error('No job description was supplied.');
 
+  const endpoint = workerEndpoint();
+  const id = await installId();
+
   const response = await withTimeout(
     (signal) =>
-      fetch(workerEndpoint(), {
+      fetch(endpoint, {
         method: 'POST',
         signal,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          [INSTALL_ID_HEADER]: id,
+        },
         body: JSON.stringify({ description: truncated }),
       }),
     REQUEST_TIMEOUT_MS

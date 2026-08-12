@@ -20,6 +20,11 @@
     'https://*.indeed.com/*',
   ];
 
+  // Must stay identical to the manifest's content_scripts[0].js list, in the
+  // same order: content.js runs immediately on load and dereferences every
+  // other module at top level, so a file missing here means a recovered tab
+  // throws before it can do anything. tests/recovery.test.js compares the two
+  // lists directly to keep them from drifting apart again.
   const CONTENT_SCRIPT_FILES = [
     'src/site.js',
     'src/classifier.js',
@@ -27,6 +32,8 @@
     'src/extractor.js',
     'src/badge.js',
     'src/aggregate.js',
+    'src/settings.js',
+    'src/filter.js',
     'src/content.js',
   ];
 

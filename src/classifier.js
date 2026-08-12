@@ -205,9 +205,16 @@
     return { category: 'UNCLEAR', reason: 'Description did not mention remote or office working arrangements clearly.' };
   }
 
+  // The service worker and the Worker both cap descriptions at this length.
+  // Truncating here as well keeps a pathological page — a job "description"
+  // of many megabytes — from being serialized across the extension message
+  // boundary just to be cut down on the other side.
+  const MAX_DESCRIPTION_CHARS = 8000;
+
   function requestLLMClassification(descriptionText) {
+    const truncated = String(descriptionText || '').slice(0, MAX_DESCRIPTION_CHARS);
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: 'LJC_CLASSIFY_LLM', description: descriptionText }, (response) => {
+      chrome.runtime.sendMessage({ type: 'LJC_CLASSIFY_LLM', description: truncated }, (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
           return;

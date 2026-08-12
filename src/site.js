@@ -145,6 +145,18 @@
     // presented to the user and their synthetic job keys do not resolve, so
     // analysing them would inflate the summary and create a guaranteed error.
     if (!card || typeof card.getBoundingClientRect !== 'function') return true;
+
+    // A card this extension hid is 0x0 by our own doing — `ljc-hidden` sets
+    // display:none. Measuring it here would confuse "the user asked us to
+    // hide this" with "Indeed rendered a decoy", and the consequence is not
+    // cosmetic: cardsFor() would stop returning the card, so the orchestrator
+    // could never call applyVisibility(card, false) on it and turning the
+    // filter back off would leave it hidden forever. It also vanished from
+    // the summary's own count of what it had hidden.
+    if (card.classList && (card.classList.contains('ljc-hidden') || card.classList.contains('ljc-hiding'))) {
+      return true;
+    }
+
     const rect = card.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   }

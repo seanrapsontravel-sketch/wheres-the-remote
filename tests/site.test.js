@@ -28,6 +28,7 @@ assert.equal(linkedin.platformName, 'LinkedIn');
 assert.equal(linkedin.cacheJobId('12345'), '12345');
 assert.equal(linkedin.jobUrl('12345'), 'https://www.linkedin.com/jobs/view/12345/');
 
+
 const classicLinkedinCard = {
   tagName: 'LI',
   parentElement: null,
@@ -129,6 +130,57 @@ assert.equal(
   'A complete inline job description for testing.'
 );
 assert.equal(indeed.descriptionFromCurrentDocument(indeedDocument, 'def456'), null);
+
+// A card the extension itself hid measures 0x0, because ljc-hidden sets
+// display:none. It must still be reachable: if the zero-size decoy filter
+// drops it, applyVisibility(card, false) can never run on it and turning the
+// hide toggle off leaves the job hidden permanently.
+const hiddenCard = { id: 'hidden-card' };
+const hiddenTitle = {
+  closest: () => hiddenCard,
+  getAttribute: (name) => (name === 'data-jk' ? 'hid789' : null),
+};
+hiddenCard.matches = () => false;
+hiddenCard.querySelector = () => hiddenTitle;
+hiddenCard.getBoundingClientRect = () => ({ width: 0, height: 0 });
+hiddenCard.classList = { contains: (c) => c === 'ljc-hidden' };
+
+const decoyCard = { id: 'decoy-card' };
+const decoyTitle = {
+  closest: () => decoyCard,
+  getAttribute: (name) => (name === 'data-jk' ? 'decoy1' : null),
+};
+decoyCard.matches = () => false;
+decoyCard.querySelector = () => decoyTitle;
+decoyCard.getBoundingClientRect = () => ({ width: 0, height: 0 });
+decoyCard.classList = { contains: () => false };
+
+const visibilityDocument = {
+  location: { href: 'https://uk.indeed.com/' },
+  getElementById: () => null,
+  querySelector: () => null,
+  querySelectorAll: (selector) => {
+    if (selector.includes('hid789')) return [hiddenTitle];
+    if (selector.includes('decoy1')) return [decoyTitle];
+    return [hiddenTitle, decoyTitle];
+  },
+};
+const indeedVisibility = loadSite('uk.indeed.com', visibilityDocument);
+// Compared element-wise: site.js builds these arrays inside the vm realm, so
+// deepEqual would reject them on Array.prototype alone.
+const reachable = indeedVisibility.cardsFor('hid789');
+assert.equal(reachable.length, 1, 'a card hidden by the extension must stay reachable');
+assert.equal(reachable[0], hiddenCard, 'and must be the same element, so it can be un-hidden');
+
+assert.equal(
+  indeedVisibility.cardsFor('decoy1').length,
+  0,
+  "Indeed's own zero-size decoy nodes must still be skipped"
+);
+
+const listed = indeedVisibility.findJobCardElements();
+assert.equal(listed.length, 1, 'the summary must count hidden cards but not decoys');
+assert.equal(listed[0], hiddenCard);
 
 const indeedSearch = loadSite(
   'uk.indeed.com',

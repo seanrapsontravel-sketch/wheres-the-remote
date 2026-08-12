@@ -30,12 +30,13 @@
   // Some boards' "job URL" is the same listing page the extension is already
   // scanning (e.g. Indeed's split view — see jobUrl() in site.js), so this
   // iframe's contentDocument can itself contain job cards matching our own
-  // content_scripts pattern (all_frames: true, whole-domain match). Without
-  // a marker, Chrome would inject the full checker into the iframe too, and
-  // it would recursively spawn further extraction iframes for those cards —
-  // this froze a real Indeed search tab in testing. window.name survives
-  // navigation within a frame, so content.js's entry guard can check it
-  // before doing anything else. Keep this value in sync with content.js.
+  // content_scripts pattern. When the manifest still set all_frames: true,
+  // Chrome injected the full checker into this iframe too and it recursively
+  // spawned further extraction iframes for those cards, freezing a real
+  // Indeed search tab in testing. The manifest is now top-frame-only, but the
+  // marker stays as a backstop. window.name survives navigation within a
+  // frame, so content.js's entry guard can check it before doing anything
+  // else. Keep this value in sync with content.js.
   const EXTRACTOR_FRAME_NAME = 'LJC_EXTRACTOR_FRAME';
 
   function createHiddenIframe(jobId) {

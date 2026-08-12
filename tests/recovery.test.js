@@ -5,6 +5,15 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'recovery.js'), 'utf8');
 
+// Recovery re-injects by hand what the manifest injects declaratively. If the
+// two lists drift, tabs recovered after install/startup/SPA navigation run a
+// partial extension and content.js throws on the first missing module — a
+// failure that never shows up on a normally-loaded page.
+const manifest = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8')
+);
+const manifestScripts = manifest.content_scripts[0];
+
 let tabs = [];
 const insertedCss = [];
 const injectedFiles = [];
@@ -61,10 +70,16 @@ assert.ok(Array.isArray(historyStateUpdatedFilter && historyStateUpdatedFilter.u
   assert.equal(insertedCss.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(insertedCss[0])), {
     target: { tabId: 42 },
-    files: ['src/badge.css'],
+    files: manifestScripts.css,
   });
   assert.equal(injectedFiles.length, 1);
-  assert.equal(injectedFiles[0].files.at(-1), 'src/content.js');
+  assert.deepEqual(
+    // Round-tripped because recovery.js builds this array inside the vm
+    // realm, where Array.prototype is not the one deepEqual compares against.
+    JSON.parse(JSON.stringify(injectedFiles[0].files)),
+    manifestScripts.js,
+    'recovery must inject exactly the manifest content scripts, in manifest order'
+  );
 
   await recovery.recoverExistingJobTabs();
   assert.equal(insertedCss.length, 1, 'an active tab must not receive duplicate CSS');

@@ -9,16 +9,96 @@ OPENAI_MODEL = "gpt-5.6-luna"
 # OPENAI_API_KEY is set as a Cloudflare secret with:
 #   npx wrangler secret put OPENAI_API_KEY
 # — never stored in this file or committed to git.
+#
+# SAFETY_ID_SALT is an optional secret, set the same way. It salts the hash
+# sent to OpenAI as safety_identifier so a bare install-id hash can't be
+# reversed by brute-forcing candidate UUIDs.
 
-# Bounds abuse of the OpenAI credential: this endpoint is otherwise anonymous
-# and its URL is public (shipped in the extension), so anyone who finds it
-# can call it directly. 20 requests/minute per IP is well above what a real
-# user's extension needs (a handful of job cards per page load) but blocks
-# scripted floods.
+# Workers Logs. Without this there is no record of how much the endpoint is
+# being used, which is the difference between noticing abuse in an hour and
+# noticing it on the invoice. Rate-limit bindings emit no dashboard metrics
+# of their own, so the console.log lines in src/index.js are the signal:
+#   - event=classified       one per successful OpenAI call, with token counts
+#   - event=global_limit_tripped   the circuit breaker firing
+# Alert on a sustained rise in the first and on any of the second.
+#
+# PRIVACY: this is a platform feature, not our console.log lines. Invocation
+# logs are "enriched with information available to Cloudflare in the context of
+# the invocation" and can include request headers — which means the raw
+# X-Install-Id may land in Workers Logs even though src/index.js never logs it.
+# docs/privacy.html discloses that explicitly; keep the two in step. Sampling
+# stays at 1 deliberately: the event=classified token counts are the only cost
+# signal that exists, and sampling below 1 would undercount the number the
+# spend alerts are built on.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+# --- Abuse and spend limiting -------------------------------------------
+#
+# The endpoint is anonymous and its URL ships inside the extension, so anyone
+# who finds it can call it. These three bindings bound the damage; see the
+# header comment in src/index.js for how they compose. Each needs its own
+# namespace_id.
+
+# SIZING RULE: every limit here is set ABOVE realistic peak human usage, not
+# at it. A throttled user does not see an error — background.js turns the 429
+# into a thrown error and classifyWithFallback quietly drops to the local
+# regex classifier, which is materially less accurate and, with the hide
+# toggle on, can hide a genuinely remote job. Degrading a real user's results
+# to save a fraction of a cent is a bad trade. These limits exist to stop
+# scripted abuse, and nothing else.
+#
+# Reference load: a LinkedIn search page is 25 results fetched 4 at a time,
+# so ~7 waves per page. Description extraction is fast in practice — often
+# ~1s, and instant on Indeed's split view, which reads the description from
+# the page it is already on rather than opening an iframe. At 1s/job a page
+# completes in ~7s, so a user paging with no pause hits ~214 req/min, and
+# that is the physical ceiling for a human: pages cannot be consumed faster
+# than they load. Every limit below clears it.
+#
+# Note the counter-intuitive direction: making extraction FASTER raises peak
+# req/min, because the user gets through more pages per minute. Re-check
+# these numbers if extraction speed changes.
+
+# Burst ceiling, checked last — immediately before the OpenAI call — so that
+# only requests about to cost money can consume it. NOT a spend cap, and not
+# even a worldwide ceiling: Cloudflare enforces rate limits per location, so
+# this number is the per-location burst, and global throughput can exceed it by
+# a multiple. Sustained 600/min is ~860k requests/day, which is an enormous
+# bill. The real cap on spend has to be a daily budget counter, which a
+# rate-limit binding cannot express (periods are 10s or 60s only) — see
+# "Abuse and spend" in README.md.
+[[ratelimits]]
+name = "GLOBAL_RATE_LIMITER"
+namespace_id = "1003"
+
+  [ratelimits.simple]
+  limit = 1200
+  period = 60
+
+# Per installation (X-Install-Id), falling back to the IP when a caller sends
+# no usable id. 300/min sits above the ~214/min physical ceiling above, so no
+# human paging at any speed can reach it. Anything sustained past this is a
+# script, not someone reading job ads.
+[[ratelimits]]
+name = "INSTALL_RATE_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 300
+  period = 60
+
+# Per IP. Deliberately loose: IPs are shared behind NAT, so an office, campus
+# or café where several people run the extension is one IP carrying several
+# users' traffic. Set at ~3 concurrent users at the physical ceiling. Its only
+# real job is catching a caller that rotates forged install ids to escape the
+# limiter above; it is a backstop, not the primary control, and it must never
+# punish a shared network.
 [[ratelimits]]
 name = "CLASSIFY_RATE_LIMITER"
 namespace_id = "1001"
 
   [ratelimits.simple]
-  limit = 20
+  limit = 600
   period = 60

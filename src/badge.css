@@ -66,6 +66,34 @@
   line-height: 15px;
 }
 
+.ljc-summary__filter {
+  margin-top: 8px;
+}
+
+.ljc-summary__filter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #3d444d;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ljc-summary__filter input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.ljc-hiding {
+  opacity: 0 !important;
+  transition: opacity 0.2s ease;
+}
+
+.ljc-hidden {
+  display: none !important;
+}
+
 .ljc-recovery {
   position: fixed;
   top: 12px;
@@ -153,11 +181,21 @@
   animation: ljc-pulse 1.4s ease-in-out infinite;
 }
 
-.ljc-badge--error .ljc-badge__pill,
 .ljc-badge--ljc-unclear .ljc-badge__pill {
   color: #565e69;
   background: #eef1f4;
   border-color: #d9dee3;
+}
+
+/* Deliberately NOT the same grey as UNCLEAR. "We read it and it doesn't say"
+   and "we could not read it" are different answers, and only one of them is
+   an answer — a user deciding whether to apply needs to tell them apart at a
+   glance. */
+.ljc-badge--error .ljc-badge__pill {
+  color: #8a5a00;
+  background: #fff4e0;
+  border-color: #f0d9a8;
+  border-style: dashed;
 }
 
 .ljc-badge--ljc-true-remote .ljc-badge__pill {
@@ -209,6 +247,10 @@
   .ljc-summary__stat {
     background: #263442;
     border-color: #455667;
+  }
+
+  .ljc-summary__filter label {
+    color: rgba(255, 255, 255, 0.72);
   }
 
   .ljc-badge__reason {
